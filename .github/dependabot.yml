@@ -1,0 +1,34 @@
+version: 2
+updates:
+  - package-ecosystem: "nuget"
+    directory: "/S3Browser"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "nuget"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    groups:
+      aws-sdk:
+        patterns:
+          - "AWSSDK.*"
+      community-toolkit:
+        patterns:
+          - "CommunityToolkit.*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
