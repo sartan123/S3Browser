@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'リリースバージョン (例: 1.0.0)'
+        required: true
+        default: '1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          # ISCC.exe を後続ステップから直接呼べるように PATH に追加
+          $iscPath = "${env:ProgramFiles(x86)}\Inno Setup 6"
+          if (-not (Test-Path $iscPath)) {
+            $iscPath = "$env:ProgramFiles\Inno Setup 6"
+          }
+          if (-not (Test-Path $iscPath)) {
+            throw "Inno Setup のインストールパスが見つかりません"
+          }
+          Add-Content -Path $env:GITHUB_PATH -Value $iscPath
+          Write-Host "Inno Setup at: $iscPath"
+
+      - name: Determine version
+        id: ver
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $v = $env:GITHUB_REF -replace '^refs/tags/v', ''
+          } elseif ('${{ github.event.inputs.version }}') {
+            $v = '${{ github.event.inputs.version }}'
+          } else {
+            $v = '0.0.0-dev'
+          }
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Resolved version: $v"
+
+      - name: Patch installer version
+        shell: pwsh
+        run: |
+          $iss = 'installer/setup.iss'
+          $content = Get-Content $iss -Raw
+          $patched = $content -replace '#define MyAppVersion "[^"]*"', '#define MyAppVersion "${{ steps.ver.outputs.version }}"'
+          Set-Content -Path $iss -Value $patched -NoNewline
+          Get-Content $iss | Select-String 'MyAppVersion'
+
+      - name: Build installer
+        shell: pwsh
+        run: pwsh installer/build.ps1
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: S3Browser-${{ steps.ver.outputs.version }}
+          path: |
+            dist/*.exe
+            publish/win-x64/S3Browser.exe
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: S3 Browser ${{ steps.ver.outputs.version }}
+          tag_name: ${{ github.ref_name }}
+          files: |
+            dist/S3Browser-${{ steps.ver.outputs.version }}-Setup.exe
+            publish/win-x64/S3Browser.exe
+          generate_release_notes: true
+          fail_on_unmatched_files: true

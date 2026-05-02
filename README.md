@@ -49,6 +49,30 @@ dotnet build S3Browser.slnx -c Release
 
 出力: `S3Browser\bin\Release\net10.0-windows\S3Browser.dll` (フレームワーク依存)。
 
+## リリース (GitHub Actions)
+
+`.github/workflows/release.yml` で `windows-latest` ランナー上のビルド + 配布を自動化しています。
+
+### タグ push でリリース
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+ワークフロー処理:
+
+1. .NET 10 SDK + Inno Setup 6 (choco) を準備
+2. タグ名からバージョンを抽出し `installer/setup.iss` の `MyAppVersion` を書き換え
+3. `installer/build.ps1` を実行してインストーラー生成
+4. **GitHub Releases** に以下を添付して公開
+   - `S3Browser-<version>-Setup.exe` (インストーラー)
+   - `S3Browser.exe` (ポータブル single-file)
+
+### 手動実行
+
+GitHub の Actions タブから `workflow_dispatch` を起動すれば任意のバージョン名でビルドできます(Release は作成されず、Artifacts に成果物が残ります)。
+
 ## ライセンス
 
 [MIT License](LICENSE)
