@@ -1,0 +1,139 @@
+<Window x:Class="S3Browser.Views.ConnectionDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:S3Browser.ViewModels"
+        Title="S3接続設定"
+        Width="520" Height="720"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        d:DataContext="{d:DesignInstance Type=vm:ConnectionDialogViewModel}"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d">
+    <Window.Resources>
+        <Style TargetType="Label">
+            <Setter Property="Margin" Value="0,8,0,2"/>
+        </Style>
+        <Style TargetType="TextBox">
+            <Setter Property="Padding" Value="4,3"/>
+        </Style>
+        <Style TargetType="PasswordBox">
+            <Setter Property="Padding" Value="4,3"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="S3に接続するための認証情報を入力してください。"
+                   TextWrapping="Wrap" Margin="0,0,0,8" Foreground="#444"/>
+
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <Label Content="リージョン"/>
+                <ComboBox ItemsSource="{Binding Regions}"
+                          IsEditable="True"
+                          Text="{Binding Region, UpdateSourceTrigger=PropertyChanged}"/>
+
+                <GroupBox Header="認証方法" Margin="0,12,0,0" Padding="8">
+                    <StackPanel>
+                        <RadioButton GroupName="Auth" Content="aws login の一時認証情報を使用"
+                                     IsChecked="{Binding Mode, Converter={StaticResource EnumMatch}, ConverterParameter=AwsLogin}"
+                                     Margin="0,2"/>
+                        <RadioButton GroupName="Auth" Content="アクセスキーを直接指定"
+                                     IsChecked="{Binding Mode, Converter={StaticResource EnumMatch}, ConverterParameter=AccessKey}"
+                                     Margin="0,2"/>
+                        <RadioButton GroupName="Auth" Content="名前付きAWSプロファイルを使用"
+                                     IsChecked="{Binding Mode, Converter={StaticResource EnumMatch}, ConverterParameter=AwsProfile}"
+                                     Margin="0,2"/>
+                        <RadioButton GroupName="Auth" Content="既定の認証情報チェーン (環境変数/IAMロールなど)"
+                                     IsChecked="{Binding Mode, Converter={StaticResource EnumMatch}, ConverterParameter=DefaultChain}"
+                                     Margin="0,2"/>
+                    </StackPanel>
+                </GroupBox>
+
+                <StackPanel Visibility="{Binding Mode, Converter={StaticResource EnumMatch}, ConverterParameter=AwsLogin}">
+                    <Label Content="プロファイル (~/.aws/config)"/>
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <ComboBox Grid.Column="0"
+                                  ItemsSource="{Binding LoginProfiles}"
+                                  Text="{Binding AwsLoginProfile, UpdateSourceTrigger=PropertyChanged}"
+                                  IsEditable="True"
+                                  TextSearch.TextPath="Name"
+                                  IsEnabled="{Binding IsAwsLoginRunning, Converter={StaticResource InverseBool}}"
+                                  ToolTip="aws login --profile に渡すプロファイル名 (空欄なら default)">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold"/>
+                                        <TextBlock Text="{Binding LoginSession}" Foreground="#666" FontSize="11"/>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                            <ComboBox.ItemContainerStyle>
+                                <Style TargetType="ComboBoxItem">
+                                    <Setter Property="Padding" Value="6,3"/>
+                                </Style>
+                            </ComboBox.ItemContainerStyle>
+                        </ComboBox>
+                        <Button Grid.Column="1" Margin="6,0,0,0" Padding="10,2"
+                                Content="再読込" Command="{Binding RefreshLoginProfilesCommand}"
+                                ToolTip="~/.aws/config を再読込"/>
+                        <Button Grid.Column="2" Margin="6,0,0,0" Padding="10,2"
+                                Content="aws login 実行..."
+                                Command="{Binding RunAwsLoginCommand}"/>
+                    </Grid>
+
+                    <TextBlock Margin="0,6,0,0" Foreground="#666"
+                               Text="{Binding AwsLoginCacheStatus}" TextWrapping="Wrap"/>
+                    <TextBlock Margin="0,4,0,0" Foreground="#666" TextWrapping="Wrap"
+                               Text="aws login を実行するとブラウザが開きます。サインインを完了するとここのリストが自動更新されます。"/>
+                </StackPanel>
+
+                <StackPanel Visibility="{Binding Mode, Converter={StaticResource EnumMatch}, ConverterParameter=AccessKey}">
+                    <Label Content="アクセスキーID"/>
+                    <TextBox Text="{Binding AccessKey, UpdateSourceTrigger=PropertyChanged}"/>
+                    <Label Content="シークレットアクセスキー"/>
+                    <PasswordBox x:Name="SecretBox"/>
+                    <Label Content="セッショントークン (一時認証情報の場合)"/>
+                    <TextBox Text="{Binding SessionToken, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="False" TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <StackPanel Visibility="{Binding Mode, Converter={StaticResource EnumMatch}, ConverterParameter=AwsProfile}">
+                    <Label Content="AWSプロファイル名"/>
+                    <TextBox Text="{Binding AwsProfileName, UpdateSourceTrigger=PropertyChanged}"/>
+                    <TextBlock Text="~/.aws/credentials または共有プロファイルストアから読み込みます。"
+                               Foreground="#666" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                </StackPanel>
+
+                <GroupBox Header="エンドポイント (S3互換ストレージ用 — 任意)" Margin="0,12,0,0" Padding="8">
+                    <StackPanel>
+                        <Label Content="サービスURL"/>
+                        <TextBox Text="{Binding ServiceUrl, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="例: http://localhost:9000 (MinIO等)"/>
+                        <CheckBox Content="パススタイル URL を強制する"
+                                  IsChecked="{Binding ForcePathStyle}" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </GroupBox>
+            </StackPanel>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,12,0,0">
+            <Button Content="接続" Width="90" Height="28" Margin="0,0,8,0"
+                    IsDefault="True" Click="OnConnectClicked"/>
+            <Button Content="キャンセル" Width="90" Height="28"
+                    IsCancel="True" Click="OnCancelClicked"/>
+        </StackPanel>
+    </Grid>
+</Window>
