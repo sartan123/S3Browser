@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 同一 PR / ブランチ への連続 push で古い run をキャンセル
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Setup .NET 10 SDK
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5.2.0
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore S3Browser.slnx
+
+      - name: Build (Debug)
+        run: dotnet build S3Browser.slnx -c Debug --no-restore
+
+      - name: Build (Release)
+        run: dotnet build S3Browser.slnx -c Release --no-restore
+
+      - name: Verify publish (single-file)
+        shell: pwsh
+        run: pwsh installer/build.ps1 -SkipInstaller
