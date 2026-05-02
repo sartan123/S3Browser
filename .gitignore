@@ -2,6 +2,8 @@
 bin/
 obj/
 out/
+publish/
+dist/
 *.user
 *.suo
 *.userprefs
